@@ -286,7 +286,7 @@ async function run() {
     })
 
     //Get All Managers
-    app.get('/managers', verifyJWT, async (req, res) => {
+    app.get('/managers', async (req, res) => {
       const managers = await managerCollection.find().toArray();
       res.send(managers);
     })
