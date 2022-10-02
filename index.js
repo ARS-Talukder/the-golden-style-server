@@ -266,7 +266,7 @@ async function run() {
 
     })
 
-    //Remove Barber Access
+    //Remove Barber Access.
     app.put('/users/remove/:email', verifyJWT, async (req, res) => {
       const email = req.params.email;
       const requester = req.decoded.email;
