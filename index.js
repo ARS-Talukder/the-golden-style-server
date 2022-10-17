@@ -2,9 +2,13 @@ const express = require('express');
 const cors = require('cors');
 const jwt = require('jsonwebtoken');
 const { MongoClient, ServerApiVersion, ObjectId } = require('mongodb');
+const nodemailer = require('nodemailer');
 require('dotenv').config();
+const stripe = require('stripe')(process.env.STRIPE_SECRET_KEY);
+
 const app = express();
 const port = process.env.PORT || 5000;
+
 app.use(cors());
 app.use(express.json());
 
@@ -29,6 +33,47 @@ function verifyJWT(req, res, next) {
   });
 }
 
+// ----------TransactionId Email Sending-----------
+const emailClient = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_SENDER,
+    pass: process.env.EMAIL_SENDER_PASS
+  },
+  port: 465,
+  host: 'smtp.gmail.com'
+
+})
+function sendTransactionIdEmail(payment) {
+  const { clientEmail, clientName, transactionId, service, date, slot } = payment;
+  const email = {
+    from: process.env.EMAIL_SENDER,
+    to: clientEmail,
+    subject: 'Your Payment is completed',
+    text: 'Your Payment is completed',
+    html: `
+          <div>
+             <p style="margin-bottom:0px">Hello,</p>
+             <p style="margin-top:0px">${clientName}</p>
+             <p>Your payment is completed for <span style="font-weight:bold">${service}</span> on <span style="font-weight:bold">${date}</span> at <span style="font-weight:bold">${slot}</span></p>
+             <h3><span style="text-decoration:underline">Your Transaction Id:</span> <span style="color:red">${transactionId}</span></h3>
+             <p>THE GOLDEN STYLE team is really happy to have you as member</p>
+             <p>For more information, Visit <a href="https://the-golden-style.netlify.app/">https://the-golden-style.netlify.app/</a></p>
+             
+             <p>Thank You</p>
+          </div>
+    `
+  };
+  emailClient.sendMail(email, (error, info) => {
+    if (error) {
+      return console.log(error);
+    }
+    else {
+      return console.log('Email Sent');
+    }
+  })
+}
+
 async function run() {
   try {
     await client.connect();
@@ -39,6 +84,7 @@ async function run() {
     const userCollection = client.db('the-golden-style').collection('users');
     const managerCollection = client.db('the-golden-style').collection('managers');
     const featureCollection = client.db('the-golden-style').collection('features');
+    const paymentCollection = client.db('the-golden-style').collection('payments');
 
 
     //Get All Services
@@ -52,6 +98,14 @@ async function run() {
       const newService = req.body;
       const result = await serviceCollection.insertOne(newService);
       res.send(result);
+    })
+
+    //Get Service by name
+    app.get('/service', async (req, res) => {
+      const name = req.query.name;
+      const query = { service_name: name };
+      const service = await serviceCollection.findOne(query);
+      res.send(service);
     })
 
 
@@ -106,6 +160,23 @@ async function run() {
         return res.status(403).send({ message: 'forbidden access' });
       }
 
+    })
+
+    //Delete Appointment
+    app.delete('/appointment-delete', async (req, res) => {
+      const id = req.query.id;
+      const query = { _id: ObjectId(id) };
+      const result = await appointmentCollection.deleteOne(query);
+      res.send(result);
+
+    })
+
+    //Get Appointment by id for payment
+    app.get('/appointment/:id', verifyJWT, async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: ObjectId(id) };
+      const appointment = await appointmentCollection.findOne(query);
+      res.send(appointment);
     })
 
     //Get My Customer Appointments
@@ -350,6 +421,40 @@ async function run() {
       const user = await userCollection.findOne({ email: email });
       const isBarber = user.role === 'barber';
       res.send({ admin: isBarber })
+    })
+
+
+    // ---------------------Payment Section-----------------------
+
+    //Payment Intent
+    app.post('/create-payment-intent', verifyJWT, async (req, res) => {
+      const service = req.body;
+      const price = service.price;
+      const amount = price * 100;
+      const paymentIntent = await stripe.paymentIntents.create({
+        amount: amount,
+        currency: 'usd',
+        payment_method_types: ['card']
+      });
+      res.send({ clientSecret: paymentIntent.client_secret });
+    })
+
+    //Update Appointment payment from due to paid and add transaction id and send email
+    app.patch('/appointment-update', verifyJWT, async (req, res) => {
+      const id = req.query.id;
+      const payment = req.body;
+      const query = { _id: ObjectId(id) };
+      const updatedDoc = {
+        $set: {
+          payment: 'paid',
+          transactionId: payment.transactionId
+        }
+      }
+      const result = await paymentCollection.insertOne(payment);
+      const updatedAppointment = await appointmentCollection.updateOne(query, updatedDoc);
+      sendTransactionIdEmail(payment);
+      res.send(updatedDoc)
+
     })
 
 
