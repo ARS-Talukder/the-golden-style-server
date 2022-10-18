@@ -57,8 +57,8 @@ function sendTransactionIdEmail(payment) {
              <p style="margin-top:0px">${clientName}</p>
              <p>Your payment is completed for <span style="font-weight:bold">${service}</span> on <span style="font-weight:bold">${date}</span> at <span style="font-weight:bold">${slot}</span></p>
              <h3><span style="text-decoration:underline">Your Transaction Id:</span> <span style="color:red">${transactionId}</span></h3>
-             <p>THE GOLDEN STYLE team is really happy to have you as member</p>
-             <p>For more information, Visit <a href="https://the-golden-style.netlify.app/">https://the-golden-style.netlify.app/</a></p>
+             <p>The Golden Style team is really happy to have you as member</p>
+             <p>For more information, Visit <a href="https://the-golden-style.web.app/">https://the-golden-style.web.app/</a></p>
              
              <p>Thank You</p>
           </div>
